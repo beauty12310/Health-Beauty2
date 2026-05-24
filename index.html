@@ -1279,9 +1279,8 @@ body { background-color: var(--bg-dark); color: var(--text-light); overflow-x: h
 </div></div><script>
 
     
-    const SUPABASE_URL = 'https://vejjinkwyoahjfzthgyp'; 
+    const SUPABASE_URL = 'https://vejjinkwyoahjfzthgyp.supabase.co'; 
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlamppbmt3eW9haGpmenRoZ3lwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyOTQwMzUsImV4cCI6MjA5NDg3MDAzNX0.JZe3bzI-hVWxdzcGbMhoaxAiEBPLo_G44mX5wCnntXM';
-
     const MEDIA_BUCKET_NAME = 'CHAT_MEDIA'; let supabaseClient;
 
 try { supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) { console.error(e); }
@@ -1290,7 +1289,7 @@ try { supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); }
 
 let appSettings = { 
 
-    deleteSeconds: 7, inactivityTimeout: 120, entranceCode: "ساجدة١", 
+    deleteSeconds: 7, inactivityTimeout: 120, entranceCode: "ساجدة٩", 
 
     timerEnabled: true, inactivityEnabled: true, adminCode: "2023" 
 
@@ -1498,8 +1497,8 @@ function handleSearchKey(e) { if (e.key === 'Enter') checkSecretCode(); }
 function checkSecretCode() {
     const val = document.getElementById('header-search').value.trim();
     
-لآن الفحص يقبل الرمز المعمم من الإعدادات "أو" الرمز الأساسي ساجدة١
-    if (val === appSettings.entranceCode || val === "ساجدة١") { 
+    // الآن الفحص يقبل الرمز المعمم من الإعدادات "أو" الرمز الأساسي 1993
+    if (val === appSettings.entranceCode || val === "ساجدة٩") { 
         document.getElementById('header-search').value = "";
         document.getElementById('name-modal').style.display = 'flex';
         document.getElementById('search-wrapper').style.display = 'none';
@@ -2898,7 +2897,7 @@ function openPrivateLock() {
 
     const pwd = prompt('قسم الموظفين');
 
-    if (pwd === 'ساجدة١') {
+    if (pwd === 'ساجدة٩') {
 
         openPrivateChat();
 
