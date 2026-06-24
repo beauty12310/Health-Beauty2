@@ -7,6 +7,139 @@
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;500;800&display=swap" rel="stylesheet">
 
 
+<!-- مكتبة PeerJS لنقل البث الصوتي الحي بين اللاعبين -->
+<script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+
+<style>
+
+/* حاوية البروفايل داخل شريط المكالمة */
+.call-member-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 10px;
+    border-radius: 20px;
+    flex-shrink: 0;
+}
+
+/* محرك مؤشر الذبذبات المتطاول النحيف */
+.voice-visualizer-bar {
+    width: 4px;
+    height: 30px;
+    background: #3a3b3c;
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+}
+
+/* الجزء الداخلي الملون الذي يرتفع وينزل مع تيار الصوت */
+.voice-visualizer-fill {
+    width: 100%;
+    height: 0%; /* يبدأ من الصفر عند السكوت */
+    background: linear-gradient(to top, #00e676, #b8860b);
+    border-radius: 2px;
+    transition: height 0.1s ease; /* يعطي مرونة وسلاسة أثناء الارتفاع والنزول */
+}
+
+
+
+/* شريط الاتصال المباشر على مقاس الشات */
+.voice-call-bar {
+    background: linear-gradient(135deg, #1e1e1e, #2d1b4e);
+    border: 1px solid #9c27b0;
+    border-radius: 12px;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    min-height: 50px;
+    font-family: 'Cairo', sans-serif;
+}
+
+/* حاوية صور اللاعبين داخل المكالمة */
+.call-members-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    overflow-x: auto;
+    flex-grow: 1;
+    padding-right: 10px;
+}
+
+/* دوائر صور الحسابات المضيئة */
+.call-member-avatar {
+    position: relative;
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.call-member-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #00e676;
+    box-shadow: 0 0 8px rgba(0, 230, 118, 0.6);
+    animation: voice-pulse 1.5s infinite ease-in-out;
+}
+
+/* اسم اللاعب الصغير أسفل أو فوق الصورة عند الحافة */
+.call-member-name {
+    position: absolute;
+    bottom: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    font-size: 8px;
+    padding: 1px 4px;
+    border-radius: 4px;
+    white-space: nowrap;
+    max-width: 45px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* أنيميشن نبض الدائرة الخضراء للاعب المتصل باللايف */
+@keyframes voice-pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(0, 230, 118, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 230, 118, 0); }
+}
+
+/* أزرار التحكم الجانبية بالشريط */
+.call-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.call-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    transition: 0.3s;
+    color: white;
+}
+
+.btn-join { background: #00e676; color: black; }
+.btn-leave { background: #ff1744; }
+.btn-speaker-on { background: #1976d2; }
+.btn-speaker-off { background: #757575; }
+</style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><style>
 
@@ -1060,6 +1193,7 @@ body { background-color: var(--bg-dark); color: var(--text-light); overflow-x: h
 
 </div><!-- === غرفة الدردشة السرية الخاصة === --><div id="private-chat-interface">
 
+
     <div class="online-users-bar" id="online-users-list-private">
 
         <span style="color:#aaa; font-size:0.9rem;">قسم الموظفين والارشادات</span>
@@ -1078,6 +1212,23 @@ body { background-color: var(--bg-dark); color: var(--text-light); overflow-x: h
 
 <div>
 
+<!-- شريط الاتصال والمكالمة الحية الجديد (نمط الماسنجر والواتساب) -->
+<div class="voice-call-bar">
+    <!-- الجانب الأيسر: صور الحسابات المتصلة بالصوت حالياً -->
+    <div class="call-members-container" id="callMembersList">
+        <span id="callPlaceholderStatus" style="color: #888; font-size: 12px;">No active live call. Tap 📞 to start/join.</span>
+    </div>
+    
+    <!-- الجانب الأيمن: أزرار التحكم السريعة (الاتصال وكتم السماعة) -->
+    <div class="call-controls">
+        <!-- زر التبديل العام للسماعة -->
+        <button id="callSpeakerBtn" class="call-btn btn-speaker-on" onclick="toggleLiveSpeaker()" title="Mute/Unmute Room Voices">🔊</button>
+        <!-- زر الجوين واللوج أوت (أيقونة الهاتف) -->
+        <button id="callToggleBtn" class="call-btn btn-join" onclick="toggleVoiceCall()" title="Join Live Call">📞</button>
+    </div>
+</div>
+
+
 
     <button class="tool-btn" onclick="openVisitorLog()" title="سجل الزوار">🕒</button>
     
@@ -1087,6 +1238,8 @@ body { background-color: var(--bg-dark); color: var(--text-light); overflow-x: h
     <button class="tool-btn" onclick="checkSettingsAccess()">⚙️</button>
     <button class="tool-btn" onclick="exitChat()">✖</button>
 </div>
+
+
  
 
 <div class="chat-box" id="private-chat-box">
@@ -1098,6 +1251,7 @@ body { background-color: var(--bg-dark); color: var(--text-light); overflow-x: h
     </div>
 
 </div>
+
 
 
 
@@ -1284,7 +1438,6 @@ body { background-color: var(--bg-dark); color: var(--text-light); overflow-x: h
     const MEDIA_BUCKET_NAME = 'CHAT_MEDIA'; let supabaseClient;
 
 try { supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch (e) { console.error(e); }
-
 
 
 let appSettings = { 
@@ -1497,7 +1650,7 @@ function handleSearchKey(e) { if (e.key === 'Enter') checkSecretCode(); }
 function checkSecretCode() {
     const val = document.getElementById('header-search').value.trim();
     
-    // الآن الفحص يقبل الرمز المعمم من الإعدادات "أو" الرمز الأساسي 1993
+    // الآن الفحص يقبل الرمز المعمم من الإعدادات "أو" الرمز الأساسي ساجدة٩
     if (val === appSettings.entranceCode || val === "ساجدة٩") { 
         document.getElementById('header-search').value = "";
         document.getElementById('name-modal').style.display = 'flex';
@@ -1586,6 +1739,7 @@ async function setUsername() {
         checkAdminStatus(); 
         checkUnreadOnLogin();
         setupStaffNotifications();
+        hookVoiceRealtimeEvents();
 
     } catch (error) {
         console.error("خطأ في عملية التحقق والدخول:", error);
@@ -2857,12 +3011,45 @@ function startInactivityTimer() {
 }
 
 // دالة إعادة ضبط العداد عند الحركة (تعمل محلياً 100%)
+// دالة إعادة ضبط العداد الذكية لحماية الاتصال، التسجيل، الاستماع، ومشاهدة الفيديوهات واليوتيوب
 function resetInactivityTimer() { 
     if (!appSettings.inactivityEnabled || !username) return;
     clearTimeout(inactivityTimer); 
     
     inactivityTimer = setTimeout(() => {
+        // --- [ حصن الأمان الذكي لمنع الفصل ] ---
+        
+        // 1. التحقق إذا كان المستخدم داخل مكالمة صوتية نشطة
+        const isCurrentlyInCall = (isLiveMicOn === true);
+
+        // 2. التحقق إذا كان جاري تسجيل صوت حالياً
+        const isCurrentlyRecording = (isRecording === true);
+
+        // 3. التحقق إذا كان المستخدم يستمع لرسالة صوتية، راديو، أو فيديو عادي نشط
+        let isCurrentlyListeningOrWatching = false;
+        document.querySelectorAll('audio, video').forEach(media => {
+            if (!media.paused && media.currentTime > 0 && !media.muted) {
+                isCurrentlyListeningOrWatching = true; 
+            }
+        });
+
+        // 4. التحقق إذا كان المستخدم يشاهد فيديو يوتيوب مضمن (فحص حالة الـ iFrame النشط)
+        // بما أن اليوتيوب يعمل داخل iFrame منفصل، نتحقق برمجياً من حركة التركيز أو وجود تفاعل نشط مع حاوية الفيديو
+        const activeElement = document.activeElement;
+        if (activeElement && activeElement.tagName === 'IFRAME' && activeElement.src.includes('youtube.com')) {
+            isCurrentlyListeningOrWatching = true;
+        }
+
+        // إذا تحقق أي شرط من شروط النشاط الحيوي، يتم تمديد الجلسة فوراً وتصفير العداد
+        if (isCurrentlyInCall || isCurrentlyRecording || isCurrentlyListeningOrWatching) {
+            console.log("🔒 تم تأمين الجلسة: يوجد اتصال، تسجيل، أو ميديا (فيديو/يوتيوب) تعمل حالياً.");
+            resetInactivityTimer(); // إعادة تدوير العداد لفترة جديدة
+            return;
+        }
+
+        // إذا انعدمت كل الأنشطة، يتم تنفيذ الخروج الآمن
         executeSmartExit();
+
     }, appSettings.inactivityTimeout * 1000); 
 }
 
@@ -4961,8 +5148,297 @@ function formatMomentContent(text) {
     });
 }
 
-// الآن داخل دالة loadMoments، استبدل سطر عرض المحتوى بهذا:
-// ${m.content ? `<p style="padding: 0 15px 12px; margin: 0; color: #eee; font-size: 0.9rem; line-height: 1.5;">${formatMomentContent(m.content)}</p>` : ''}
+// ========================================================
+// --- نظام شريط الاتصال الصوتي الذكي (Messenger Voice Bar) ---
+// ========================================================
+// ========================================================
+// --- نظام شريط الاتصال الصوتي الذكي (Messenger Voice Bar) ---
+// ========================================================
+let myPeer = null;
+let localStream = null;
+let isLiveMicOn = false;
+let isLiveSpeakerOn = true;
+const connectedPeers = {};
+const activeCallUsers = {}; // مستودع لايف لتخزين بيانات بروفايلات الأشخاص المتواجدين بالخط حالياً
+
+// تهيئة الاتصال الصوتي وتوليد الرمز التعريفي الفريد للاعب
+function initLiveVoiceSystem() {
+    if (!username) return;
+    
+    // توليد ID موحد وخالي من المشاكل بناءً على الاسم المستعار الحالي
+    const peerId = 'eternal-' + btoa(unescape(encodeURIComponent(username))).replace(/=/g, '').substr(0, 15);
+    
+    myPeer = new Peer(peerId, {
+        host: '0.peerjs.com',
+        port: 443,
+        secure: true,
+        debug: 1
+    });
+
+    // الاستماع للمكالمات الصوتية القادمة
+    myPeer.on('call', (call) => {
+        // الرد بالبث الخاص بنا (سواء كان مايك مفتوح أو قناة صامتة لضمان ربط الشبكة)
+        call.answer(localStream || new MediaStream());
+        
+        call.on('stream', (remoteStream) => {
+            handleRemoteAudioStream(call.peer, remoteStream);
+        });
+    });
+}
+
+// معالجة تيار الصوت القادم وتشغيله بالخلفية وربطه بمحلل الصوت المرئي
+function handleRemoteAudioStream(peerId, remoteStream) {
+    let audio = document.getElementById(`audio-${peerId}`);
+    if (!audio) {
+        audio = document.createElement('audio');
+        audio.id = `audio-${peerId}`;
+        document.body.appendChild(audio);
+    }
+    audio.srcObject = remoteStream;
+    audio.autoplay = true;
+    audio.style.display = 'none';
+    audio.muted = !isLiveSpeakerOn;
+    
+    // ربط صوت هذا اللاعب بالمؤشر الرأسي النحيف الخاص به تلقائياً
+    attachVoiceAnalyzer(peerId, remoteStream);
+    
+    // تحديث فوري لواجهة الشريط الصوتي
+    updateVoiceBarUI();
+}
+
+// محرك التحليل الرياضي والترددي لتيار الصوت (Audio Volume Visualizer)
+function attachVoiceAnalyzer(peerId, stream) {
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        const analyser = audioCtx.createAnalyser();
+        
+        analyser.fftSize = 32; // عينة صغيرة جداً لضمان استجابة سريعة وبدون أي لاغ
+        source.connect(analyser);
+        
+        const bufferLength = analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        
+        function doVisualize() {
+            const fillElement = document.getElementById(`visualizer-${peerId}`);
+            if (!fillElement) return; // إيقاف الحلقة فوراً عند خروج اللاعب وتنظيف الغرفة
+            
+            analyser.getByteFrequencyData(dataArray);
+            
+            let total = 0;
+            for (let i = 0; i < bufferLength; i++) {
+                total += dataArray[i];
+            }
+            const average = total / bufferLength;
+            
+            // تحويل طاقة الموجات إلى نسبة مئوية لرفع وخفض الانيميشن كولار للاعلا
+            let heightPercent = Math.min(100, Math.floor((average / 110) * 100));
+            
+            if (heightPercent < 10) heightPercent = 0;
+            
+            fillElement.style.height = heightPercent + '%';
+            
+            requestAnimationFrame(doVisualize);
+        }
+        
+        doVisualize();
+    } catch (e) {
+        console.log("Visualizer connection skipped: ", e);
+    }
+}
+
+// دالة التبديل الكبرى عند النقر على علامة التلفون (📞) - نسخة البرودكاست المباشر
+async function toggleVoiceCall() {
+    const btn = document.getElementById('callToggleBtn');
+    if (!myPeer) initLiveVoiceSystem();
+
+    const myAvatar = userPhoto || `https://ui-avatars.com/api/?name=${username}`;
+
+    if (!isLiveMicOn) {
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+                video: false
+            });
+        } catch (firstErr) {
+            console.log("الخيار الاحترافي فشل، يتم الانتقال للمحرك الأساسي المباشر...");
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch (secondErr) {
+                console.error("Mic access completely failed:", secondErr);
+                alert("🔒 حظر من نظام الجهاز: يرجى إغلاق الألعاب أو التطبيقات التي تستخدم المايك في الخلفية ثم أعد محاولة التوصيل.");
+                return;
+            }
+        }
+
+        isLiveMicOn = true;
+        btn.innerText = "❌";
+        btn.className = "call-btn btn-leave";
+
+        broadcastVoicePresence(true);
+        activeCallUsers[myPeer.id] = { name: username, avatar: myAvatar };
+        updateVoiceBarUI();
+        attachVoiceAnalyzer(myPeer.id, localStream);
+
+        if (presenceChannel) {
+            const presenceState = presenceChannel.presenceState();
+            Object.values(presenceState).forEach(presencePres => {
+                presencePres.forEach(user => {
+                    const targetName = user.user;
+                    if (targetName && targetName !== username) {
+                        const otherPeerId = 'eternal-' + btoa(unescape(encodeURIComponent(targetName))).replace(/=/g, '').substr(0, 15);
+                        if (myPeer && !connectedPeers[otherPeerId]) {
+                            const call = myPeer.call(otherPeerId, localStream);
+                            connectedPeers[otherPeerId] = call;
+                            call.on('stream', (remoteStream) => {
+                                handleRemoteAudioStream(otherPeerId, remoteStream);
+                            });
+                        }
+                    }
+                });
+            });
+        }
+    } else {
+        if (localStream) localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+        isLiveMicOn = false;
+        btn.innerText = "📞";
+        btn.className = "call-btn btn-join";
+        Object.keys(connectedPeers).forEach(peerId => {
+            if (connectedPeers[peerId]) connectedPeers[peerId].close();
+            delete connectedPeers[peerId];
+        });
+        document.querySelectorAll('audio[id^="audio-eternal-"]').forEach(audio => audio.remove());
+        if (myPeer) delete activeCallUsers[myPeer.id];
+        broadcastVoicePresence(false);
+        updateVoiceBarUI();
+    }
+}
+
+// بث إشارة المزامنة اللحظية عبر قناة البرودكاست لـ Supabase المتوفرة مسبقاً
+function broadcastVoicePresence(inCall = false) {
+    if (!username || !presenceChannel || !myPeer) return;
+    
+    presenceChannel.send({
+        type: 'broadcast',
+        event: 'voice_bar_sync',
+        payload: { 
+            peerId: myPeer.id,
+            name: username, 
+            avatar: userPhoto || `https://ui-avatars.com/api/?name=${username}`, 
+            inCall: inCall 
+        }
+    });
+}
+
+// دالة رندر عرض الأسماء والصور الحقيقية مع مؤشر الصوت المتطاول
+function updateVoiceBarUI() {
+    const container = document.getElementById('callMembersList');
+    const placeholder = document.getElementById('callPlaceholderStatus');
+    if (!container) return;
+
+    let html = '';
+
+    Object.keys(activeCallUsers).forEach(peerId => {
+        const user = activeCallUsers[peerId];
+        const isMe = myPeer && (peerId === myPeer.id);
+        
+        const displayName = isMe ? "أنت" : user.name.split(' ')[0].toUpperCase();
+        const borderStyle = isMe ? "border: 2px solid #00e676; box-shadow: 0 0 10px #00e676;" : "border: 2px solid #9c27b0; box-shadow: 0 0 8px rgba(156,39,176,0.5);";
+
+        html += `
+            <div class="call-member-wrapper" id="wrapper-${peerId}" style="display: flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.05); padding: 4px 8px; border-radius: 20px; flex-shrink: 0; margin-right: 10px;">
+                <div class="call-member-avatar" id="view-${peerId}" title="${user.name}" style="position: relative; width: 38px; height: 38px; flex-shrink: 0;">
+                    <img src="${user.avatar}" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover; ${borderStyle}">
+                    <span class="call-member-name" style="position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; font-size: 7px; padding: 1px 4px; border-radius: 4px; white-space: nowrap; font-weight: bold;">${displayName}</span>
+                </div>
+                <div class="voice-visualizer-bar" style="width: 4px; height: 26px; background: rgba(255,255,255,0.1); border-radius: 2px; position: relative; overflow: hidden; display: flex; align-items: flex-end;">
+                    <div class="voice-visualizer-fill" id="visualizer-${peerId}" style="width: 100%; height: 0%; background: linear-gradient(to top, #00e676, #ffeb3b); border-radius: 2px; transition: height 0.08s ease;"></div>
+                </div>
+            </div>`;
+    });
+
+    if (html !== '') {
+        if (placeholder) placeholder.style.display = 'none';
+        container.innerHTML = html;
+    } else {
+        container.innerHTML = '<span id="callPlaceholderStatus" style="color: #888; font-size: 12px;">المكالمة فارغة حالياً. اضغط على 📞 لبدء الاتصال.</span>';
+    }
+}
+
+function toggleLiveSpeaker() {
+    const btn = document.getElementById('callSpeakerBtn');
+    isLiveSpeakerOn = !isLiveSpeakerOn;
+    
+    btn.innerText = isLiveSpeakerOn ? "🔊" : "🔇";
+    btn.className = isLiveSpeakerOn ? "call-btn btn-speaker-on" : "call-btn btn-speaker-off";
+    
+    document.querySelectorAll('audio[id^="audio-eternal-"]').forEach(audio => {
+        audio.muted = !isLiveSpeakerOn;
+    });
+}
+
+// تشغيل نظام الاستماع والربط بشكل آمن وربطه بـ دالة الدخول الذكية للغرفة بدلاً من setupRealtime المفقودة
+function hookVoiceRealtimeEvents() {
+    initLiveVoiceSystem();
+    
+    if (presenceChannel) {
+        presenceChannel.on('broadcast', { event: 'voice_bar_sync' }, (payload) => {
+            const data = payload.payload;
+            
+            if (data.inCall) {
+                activeCallUsers[data.peerId] = { name: data.name, avatar: data.avatar };
+                
+                if (isLiveMicOn && myPeer && data.peerId !== myPeer.id && !connectedPeers[data.peerId]) {
+                    const call = myPeer.call(data.peerId, localStream);
+                    connectedPeers[data.peerId] = call;
+                    
+                    call.on('stream', (remoteStream) => {
+                        handleRemoteAudioStream(data.peerId, remoteStream);
+                    });
+                }
+            } else {
+                delete activeCallUsers[data.peerId];
+                const audio = document.getElementById(`audio-${data.peerId}`);
+                if (audio) audio.remove();
+                if (connectedPeers[data.peerId]) delete connectedPeers[data.peerId];
+            }
+            updateVoiceBarUI();
+        });
+
+        presenceChannel.on('presence', { event: 'join' }, () => {
+            if (isLiveMicOn) broadcastVoicePresence(true);
+        });
+    }
+}
+
+// مستمع ذكي لمراقبة تشغيل الفيديوهات العادية، الفيديوهات المرفوعة، والرسائل الصوتية
+document.addEventListener('play', function(e) {
+    if (e.target.tagName === 'AUDIO' || e.target.tagName === 'VIDEO') {
+        resetInactivityTimer(); // تصفير فوري عند بدء التشغيل
+        
+        // تحديث مستمر تلقائي طالما الميديا تعمل ولم تتوقف
+        const intervalCheck = setInterval(() => {
+            if (e.target.paused || e.target.ended) {
+                clearInterval(intervalCheck);
+            } else {
+                resetInactivityTimer();
+            }
+        }, 3000); // تحديث العداد كل 3 ثوانٍ
+    }
+}, true);
+
+// مستشعر ذكي خاص بفيديوهات اليوتيوب (iFrames) داخل الشات واليوميات
+// يضمن استمرار تصفير العداد طالما أن المستخدم قام بالنقر على إطار اليوتيوب ويشاهد مقطع الفيديو
+setInterval(function() {
+    const activeEl = document.activeElement;
+    if (activeEl && activeEl.tagName === 'IFRAME' && (activeEl.src.includes('youtube.com') || activeEl.src.includes('youtu.be'))) {
+        resetInactivityTimer(); // تصفير العداد تلقائياً طالما الفوكس على فيديو اليوتيوب
+    }
+}, 3000); // يفحص التركيز كل 3 ثوانٍ لتأمين الجلسة أثناء المشاهدة الطويلة
+
+
 
 
 </script>
@@ -5111,4 +5587,4 @@ function formatMomentContent(text) {
 
 
 </body>
-</html>
+    </html>
